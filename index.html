@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+/* CSS goes here. */
+.subunit.SCT { fill: #ddc; }
+.subunit.WLS { fill: #cdd; }
+.subunit.NIR { fill: #cdc; }
+.subunit.ENG { fill: #dcd; }
+.subunit.IRL { display: none; }
+
+.subunit-boundary {
+  fill: none;
+  stroke: #777;
+  stroke-dasharray: 2, 2;
+  stroke-linejoin: round;
+}
+
+.subunit-boundary.IRL {
+  stroke: #aaa;
+}
+
+text {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 10px;
+  pointer-events: none;
+}
+
+.subunit-label {
+  fill: #777;
+  fill-opacity: .5;
+  font-size: 20px;
+  font-weight: 300;
+  text-anchor: middle;
+}
+
+</style>
+<body>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="http://d3js.org/topojson.v0.min.js"></script>
+<script>
+var width = 960,
+    height = 1160;
+
+// Original Projection
+// var projection = d3.geo.mercator()
+//     .scale(500)
+//     .translate([width /2, height /2]);
+
+// Albers equal-area conic Projection
+var projection = d3.geo.albers()
+    .center([0, 55.4])
+    .rotate([4.4, 0])
+    .parallels([50, 60])
+    .scale(6000)
+    .translate([width /2, height /2]);
+
+// Apply paths/place point radius size
+var path = d3.geo.path()
+    .projection(projection)
+    .pointRadius(2);
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+d3.json("uk.json", function(error, uk) {
+  console.log(uk);
+  var subunits = topojson.object(uk, uk.objects.subunits),
+      places = topojson.object(uk, uk.objects.places);
+
+  // Add country code classes
+  svg.selectAll('.subunit')
+      .data(subunits.geometries)
+    .enter().append("path")
+      .attr("class", function(d) {return "subunit " + d.id })
+      .attr("d", path);
+
+  // Add Internal England/Wales/Scotland boundary lines
+  svg.append("path")
+      .datum(topojson.mesh(uk, uk.objects.subunits, function(a, b) { return a !== b && a.id !== "IRL" }))
+      .attr("d", path)
+      .attr("class", "subunit-boundary");
+
+  // Add Ireland Coastline boundary lines
+  svg.append("path")
+      .datum(topojson.mesh(uk, uk.objects.subunits, function(a, b) { return a === b && a.id === "IRL" }))
+      .attr("d", path)
+      .attr("class", "subunit-boundary IRL");
+
+// Add country labels
+  svg.selectAll(".subunit-label")
+      .data(subunits.geometries)
+    .enter().append("text")
+      .attr("class", function(d) { return "subunit-label " + d.id; })
+      .attr("transform", function(d) { return "translate(" + path.centroid(d) + ")"; })
+      .attr("dy", "0.35em")
+      .text(function(d) { return d.properties.name; });
+
+  // Add populated places (marker)
+  svg.append("path")
+      .datum(places)
+      .attr("d", path)
+      .attr("class", "place");
+
+  // Add labels for populated places
+  // Also fix alignment of place labels:
+  //   vertically: about 0.35em offset,
+  //   horizontally: right-align place labels on left side of map and vice-versa
+  //     using 1 degree West as threshold determining west/east
+  svg.selectAll(".place-label")
+       .data(places.geometries)
+    .enter().append("text")
+      .attr("class", "place-label")
+      .attr("transform", function(d) { return "translate(" + projection(d.coordinates) + ")"; })
+      .attr("x", function(d) { return d.coordinates[0] > -1 ? 6 : -6; })
+      .attr("dy", "0.35em")
+      .style("text-anchor", function(d) { return d.coordinates[0] > -1 ? "start" : "end"; })
+      .text(function(d) { return d.properties.name; });
+});
+
+</script>
